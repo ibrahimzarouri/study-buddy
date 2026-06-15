@@ -1,1 +1,0 @@
-& "d:\University of Applied Sciences\Master\AAI\Data Analysis Copilot\venv\Scripts\streamlit.exe" run "D:\University of Applied Sciences\Master\Masterproject\Study-buddy\app.py"
