@@ -65,8 +65,20 @@ streamlit run app.py
 
 The app will open automatically in your browser at `http://localhost:8501`.
 
+## Running tests
+
+The project includes a unit test suite. From the project folder, run:
+
+```bash
+python -m pytest tests/ -v
+```
+
 ## Supported file types
 
 - PDF (`.pdf`)
 - Word (`.docx`)
 - Plain text (`.txt`)
+
+## Documentation
+
+See [DOCUMENTATION.md](DOCUMENTATION.md) for the technical documentation: architecture, processing pipeline, prompt design, testing, design decisions, and known limitations.
