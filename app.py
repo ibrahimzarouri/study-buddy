@@ -17,8 +17,9 @@ for _k, _v in {
     "agent": None,
     "topics": [],
     "conversation": [],
-    "app_state": "upload",   # upload | topic_select | questioning | feedback
+    "app_state": "upload",   # upload | topic_select | questioning | feedback | mastered
     "last_filename": None,
+    "celebrate": False,
 }.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
@@ -42,15 +43,31 @@ def _load_file(uploaded_file):
 def _select_topic(topic: str):
     agent: StudyBuddyAgent = st.session_state.agent
     question = agent.start_topic(topic)
+    n_concepts = len(agent.concepts)
     st.session_state.conversation = [
         {
             "role": "buddy",
-            "content": f"Let's explore **{topic}**. Try to explain the concepts in your own words — I'll give you feedback and dig deeper with follow-up questions.",
+            "content": (
+                f"Let's explore **{topic}**. I've identified **{n_concepts} key concepts** "
+                "you'll need to explain to master this topic. Explain in your own words — "
+                "I'll give you feedback and dig deeper with follow-up questions."
+            ),
             "type": "intro",
         },
         {"role": "buddy", "content": question, "type": "question"},
     ]
     st.session_state.app_state = "questioning"
+
+
+def _render_progress():
+    agent: StudyBuddyAgent = st.session_state.agent
+    if not agent or not agent.concepts:
+        return
+    done, total = agent.progress
+    st.progress(done / total, text=f"Concepts mastered: {done}/{total}")
+    with st.expander("Concept checklist"):
+        for concept, covered in agent.concepts.items():
+            st.markdown(f"{'✅' if covered else '⬜'} {concept}")
 
 
 def _render_conversation():
@@ -62,6 +79,8 @@ def _render_conversation():
                     st.markdown(f"**{msg['content']}**")
                 elif t == "intro":
                     st.info(msg["content"])
+                elif t == "mastered":
+                    st.success(msg["content"])
                 elif t == "feedback":
                     score = msg.get("score", "partial")
                     if score == "correct":
@@ -103,8 +122,12 @@ with st.sidebar:
         for topic in st.session_state.topics:
             if st.button(topic, key=f"btn_{topic}", use_container_width=True):
                 with st.spinner("Preparing first question…"):
-                    _select_topic(topic)
-                st.rerun()
+                    try:
+                        _select_topic(topic)
+                    except Exception as e:
+                        st.error(f"Could not start topic: {e}")
+                    else:
+                        st.rerun()
 
     st.divider()
     st.caption(f"Model: {os.getenv('MODEL', 'not configured')}")
@@ -123,19 +146,16 @@ if state == "upload":
 
 1. Upload your lecture notes or slides (PDF, Word, or plain text)
 2. StudyBuddy extracts the main topics automatically
-3. Select a topic — StudyBuddy asks you a question **from the material only**
+3. Select a topic — StudyBuddy identifies its key concepts and asks you a question **from the material only**
 4. Explain the concept in your own words
-5. Get instant feedback and targeted follow-up questions until the topic is mastered
+5. Get instant feedback and targeted follow-up questions until **every key concept** of the topic is mastered
 """)
 
 elif state == "topic_select":
-    st.info("Document loaded. Select a topic from the sidebar to start a session.")
-    if st.session_state.topics:
-        st.subheader("Detected topics:")
-        for t in st.session_state.topics:
-            st.markdown(f"- {t}")
+    st.info("Please choose a topic from the **Topics** list in the sidebar to start a session.")
 
-elif state in ("questioning", "feedback"):
+elif state in ("questioning", "feedback", "mastered"):
+    _render_progress()
     _render_conversation()
 
     if state == "questioning":
@@ -145,13 +165,38 @@ elif state in ("questioning", "feedback"):
                 {"role": "student", "content": answer, "type": "answer"}
             )
             with st.spinner("Evaluating your answer…"):
-                result = st.session_state.agent.evaluate_answer(answer)
+                try:
+                    result = st.session_state.agent.evaluate_answer(answer)
+                except Exception as e:
+                    st.session_state.conversation.pop()
+                    st.error(f"The AI service did not respond ({e}). Please submit your answer again.")
+                    st.stop()
 
+            agent: StudyBuddyAgent = st.session_state.agent
             score = result.get("score", "partial")
             feedback = result.get("feedback", "")
             follow_up = result.get("follow_up")
 
-            if score == "correct":
+            if agent.topic_complete:
+                st.session_state.conversation.append(
+                    {
+                        "role": "buddy",
+                        "content": f"Correct! {feedback}" if score == "correct" else feedback,
+                        "type": "feedback",
+                        "score": score,
+                    }
+                )
+                st.session_state.conversation.append(
+                    {
+                        "role": "buddy",
+                        "content": f"🎉 You've explained all key concepts of **{agent.current_topic}** — topic mastered!",
+                        "type": "mastered",
+                    }
+                )
+                st.session_state.celebrate = True
+                st.session_state.app_state = "mastered"
+
+            elif score == "correct":
                 st.session_state.conversation.append(
                     {
                         "role": "buddy",
@@ -172,11 +217,11 @@ elif state in ("questioning", "feedback"):
                 # Stay in "questioning" — follow_up is now the active question
 
             else:
-                # Max follow-ups reached or no follow-up generated
+                # Max follow-ups reached — retry the concept from a fresh angle
                 st.session_state.conversation.append(
                     {
                         "role": "buddy",
-                        "content": f"{feedback} Let's move on.",
+                        "content": f"{feedback} Let's approach this from another angle.",
                         "type": "feedback",
                         "score": score,
                     }
@@ -190,7 +235,11 @@ elif state in ("questioning", "feedback"):
         with col1:
             if st.button("Next Question →", type="primary", use_container_width=True):
                 with st.spinner("Generating next question…"):
-                    q = st.session_state.agent.next_question()
+                    try:
+                        q = st.session_state.agent.next_question()
+                    except Exception as e:
+                        st.error(f"The AI service did not respond ({e}). Please try again.")
+                        st.stop()
                 st.session_state.conversation.append(
                     {"role": "buddy", "content": q, "type": "question"}
                 )
@@ -206,5 +255,31 @@ elif state in ("questioning", "feedback"):
                 topic = st.session_state.agent.current_topic
                 if topic:
                     with st.spinner("Restarting…"):
-                        _select_topic(topic)
+                        try:
+                            _select_topic(topic)
+                        except Exception as e:
+                            st.error(f"Could not restart: {e}")
+                        else:
+                            st.rerun()
+
+    elif state == "mastered":
+        if st.session_state.celebrate:
+            st.balloons()
+            st.session_state.celebrate = False
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Choose Next Topic →", type="primary", use_container_width=True):
+                st.session_state.conversation = []
+                st.session_state.app_state = "topic_select"
                 st.rerun()
+        with col2:
+            if st.button("Restart This Topic", use_container_width=True):
+                topic = st.session_state.agent.current_topic
+                if topic:
+                    with st.spinner("Restarting…"):
+                        try:
+                            _select_topic(topic)
+                        except Exception as e:
+                            st.error(f"Could not restart: {e}")
+                        else:
+                            st.rerun()
