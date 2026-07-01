@@ -15,8 +15,8 @@ def load_document(uploaded_file, filename: str) -> str:
 
 
 def _load_pdf(file_obj) -> str:
-    import PyPDF2
-    reader = PyPDF2.PdfReader(file_obj)
+    from pypdf import PdfReader
+    reader = PdfReader(file_obj)
     pages = []
     for page in reader.pages:
         text = page.extract_text() or ""
