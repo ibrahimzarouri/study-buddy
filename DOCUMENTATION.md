@@ -10,24 +10,25 @@ StudyBuddy is an AI learning partner developed as a Master's project at the West
 ## 1. Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     app.py (Streamlit UI)                    │
-│        state machine, chat rendering, progress display       │
-└──────────────┬──────────────────────────────┬───────────────┘
-               │                              │
-               ▼                              ▼
-┌──────────────────────────┐   ┌──────────────────────────────┐
-│  tools/document_loader   │   │   agent/StudyBuddyAgent      │
-│  PDF / DOCX / TXT → text │   │   topic & concept extraction, │
-└──────────────┬───────────┘   │   question generation,        │
-               │               │   answer evaluation,          │
-               ▼               │   mastery tracking            │
-┌──────────────────────────┐   └───────┬──────────────┬───────┘
-│      tools/RAGIndex      │◄──────────┘              │
-│  chunking, embeddings,   │            ┌─────────────▼───────┐
-│  FAISS similarity search │            │  LLM API (OpenAI-   │
-└──────────────────────────┘            │  compatible endpoint)│
-                                        └─────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                   app.py (Streamlit UI)                    │
+│      state machine, chat rendering, progress display       │
+└─────────────┬───────────────────────────────┬──────────────┘
+              │                               │
+              ▼                               ▼
+┌──────────────────────────┐   ┌─────────────────────────────┐
+│  tools/document_loader   │   │    agent/StudyBuddyAgent    │
+│ PDF / DOCX / TXT → text  │   │  topic & concept extraction │
+└─────────────┬────────────┘   │  question generation        │
+              │                │  answer evaluation          │
+              ▼                │  mastery tracking           │
+┌──────────────────────────┐   └──────┬──────────────┬───────┘
+│      tools/RAGIndex      │◄─────────┘              │
+│  chunking, embeddings,   │                         │
+│  FAISS similarity search │             ┌───────────▼────────────┐
+└──────────────────────────┘             │  LLM API (OpenAI-      │
+                                         │  compatible endpoint)  │
+                                         └────────────────────────┘
 ```
 
 ### Project structure
@@ -77,9 +78,9 @@ Study-buddy/
 
 ```
  upload ──► topic_select ──► questioning ◄──► feedback
-                 ▲                │               │
-                 │                ▼               │
-                 └───────────  mastered  ◄────────┘
+                 ▲                │
+                 │                ▼
+                 └───────────  mastered
 ```
 
 | State | Meaning | Transitions |
