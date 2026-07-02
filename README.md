@@ -1,4 +1,4 @@
-# StudyBuddy — AI Learning Partner
+# StudyBuddy - AI Learning Partner
 
 An AI-powered study assistant that quizzes you on your own lecture materials using RAG and LLM feedback.
 
@@ -6,7 +6,7 @@ An AI-powered study assistant that quizzes you on your own lecture materials usi
 
 1. Upload your lecture notes or slides (PDF, Word, or plain text)
 2. StudyBuddy extracts the main topics automatically
-3. Select a topic — StudyBuddy asks you a comprehension question based on your material
+3. Select a topic - StudyBuddy asks you a comprehension question based on your material
 4. Explain the concept in your own words
 5. Get instant feedback and targeted follow-up questions until the topic is mastered
 
@@ -64,6 +64,27 @@ streamlit run app.py
 ```
 
 The app will open automatically in your browser at `http://localhost:8501`.
+
+## Run with Docker (alternative)
+
+If you have [Docker](https://www.docker.com/products/docker-desktop/) installed, you can skip the Python setup entirely. You still need the `.env` file from step 3 - it is passed to the container at runtime and never baked into the image.
+
+From the project folder, run:
+
+```bash
+docker compose up --build
+```
+
+Then open `http://localhost:8501` in your browser.
+
+Or without Docker Compose:
+
+```bash
+docker build -t studybuddy .
+docker run --env-file .env -p 8501:8501 studybuddy
+```
+
+> The first build downloads the ML dependencies and the embedding model, so it can take several minutes. Later builds reuse the cache and are fast.
 
 ## Running tests
 

@@ -46,7 +46,7 @@ def _select_topic(topic: str):
     n_concepts = len(agent.concepts)
     st.session_state.conversation = [
         {
-            "role": "buddy",
+            "role": "assistant",
             "content": (
                 f"Let's explore **{topic}**. I've identified **{n_concepts} key concepts** "
                 "you'll need to explain to master this topic. Explain in your own words — "
@@ -54,7 +54,7 @@ def _select_topic(topic: str):
             ),
             "type": "intro",
         },
-        {"role": "buddy", "content": question, "type": "question"},
+        {"role": "assistant", "content": question, "type": "question"},
     ]
     st.session_state.app_state = "questioning"
 
@@ -72,25 +72,23 @@ def _render_progress():
 
 def _render_conversation():
     for msg in st.session_state.conversation:
-        if msg["role"] == "buddy":
-            with st.chat_message("assistant", avatar="🤖"):
-                t = msg["type"]
-                if t == "question":
-                    st.markdown(f"**{msg['content']}**")
-                elif t == "intro":
-                    st.info(msg["content"])
-                elif t == "mastered":
+        with st.chat_message(msg["role"]):
+            t = msg["type"]
+            if t == "question":
+                st.markdown(f"**{msg['content']}**")
+            elif t == "intro":
+                st.info(msg["content"])
+            elif t == "mastered":
+                st.success(msg["content"])
+            elif t == "feedback":
+                score = msg.get("score", "partial")
+                if score == "correct":
                     st.success(msg["content"])
-                elif t == "feedback":
-                    score = msg.get("score", "partial")
-                    if score == "correct":
-                        st.success(msg["content"])
-                    elif score == "partial":
-                        st.warning(msg["content"])
-                    else:
-                        st.error(msg["content"])
-        else:
-            with st.chat_message("user", avatar="🎓"):
+                elif score == "partial":
+                    st.warning(msg["content"])
+                else:
+                    st.error(msg["content"])
+            else:
                 st.markdown(msg["content"])
 
 
@@ -162,7 +160,7 @@ elif state in ("questioning", "feedback", "mastered"):
         answer = st.chat_input("Explain your understanding…")
         if answer:
             st.session_state.conversation.append(
-                {"role": "student", "content": answer, "type": "answer"}
+                {"role": "user", "content": answer, "type": "answer"}
             )
             with st.spinner("Evaluating your answer…"):
                 try:
@@ -180,7 +178,7 @@ elif state in ("questioning", "feedback", "mastered"):
             if agent.topic_complete:
                 st.session_state.conversation.append(
                     {
-                        "role": "buddy",
+                        "role": "assistant",
                         "content": f"Correct! {feedback}" if score == "correct" else feedback,
                         "type": "feedback",
                         "score": score,
@@ -188,7 +186,7 @@ elif state in ("questioning", "feedback", "mastered"):
                 )
                 st.session_state.conversation.append(
                     {
-                        "role": "buddy",
+                        "role": "assistant",
                         "content": f"🎉 You've explained all key concepts of **{agent.current_topic}** — topic mastered!",
                         "type": "mastered",
                     }
@@ -199,7 +197,7 @@ elif state in ("questioning", "feedback", "mastered"):
             elif score == "correct":
                 st.session_state.conversation.append(
                     {
-                        "role": "buddy",
+                        "role": "assistant",
                         "content": f"Correct! {feedback}",
                         "type": "feedback",
                         "score": "correct",
@@ -209,10 +207,10 @@ elif state in ("questioning", "feedback", "mastered"):
 
             elif follow_up:
                 st.session_state.conversation.append(
-                    {"role": "buddy", "content": feedback, "type": "feedback", "score": score}
+                    {"role": "assistant", "content": feedback, "type": "feedback", "score": score}
                 )
                 st.session_state.conversation.append(
-                    {"role": "buddy", "content": follow_up, "type": "question"}
+                    {"role": "assistant", "content": follow_up, "type": "question"}
                 )
                 # Stay in "questioning" — follow_up is now the active question
 
@@ -220,7 +218,7 @@ elif state in ("questioning", "feedback", "mastered"):
                 # Max follow-ups reached — retry the concept from a fresh angle
                 st.session_state.conversation.append(
                     {
-                        "role": "buddy",
+                        "role": "assistant",
                         "content": f"{feedback} Let's approach this from another angle.",
                         "type": "feedback",
                         "score": score,
@@ -241,7 +239,7 @@ elif state in ("questioning", "feedback", "mastered"):
                         st.error(f"The AI service did not respond ({e}). Please try again.")
                         st.stop()
                 st.session_state.conversation.append(
-                    {"role": "buddy", "content": q, "type": "question"}
+                    {"role": "assistant", "content": q, "type": "question"}
                 )
                 st.session_state.app_state = "questioning"
                 st.rerun()

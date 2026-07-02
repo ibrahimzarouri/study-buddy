@@ -1,0 +1,27 @@
+# Secrets — must never end up inside the image
+.env
+
+# Local-only files
+How to.txt
+
+# Git
+.git
+.gitignore
+
+# Python caches and environments
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Editor / OS
+.vscode/
+.DS_Store
+
+# Docker files themselves
+Dockerfile
+docker-compose.yml
+.dockerignore
