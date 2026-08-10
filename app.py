@@ -28,6 +28,7 @@ for _k, _v in {
     "app_state": "upload",   # upload | topic_select | questioning | feedback | mastered
     "last_filename": None,
     "celebrate": False,
+    "mistakes": [],          # questions answered partially or incorrectly, across topics
 }.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
@@ -43,6 +44,7 @@ def _load_file(uploaded_file):
     st.session_state.agent = agent
     st.session_state.topics = topics
     st.session_state.conversation = []
+    st.session_state.mistakes = []
     st.session_state.app_state = "topic_select"
     st.session_state.last_filename = uploaded_file.name
     return len(text), topics
@@ -100,11 +102,33 @@ def _render_conversation():
                 st.markdown(msg["content"])
 
 
+def _render_mistakes():
+    mistakes = st.session_state.mistakes
+    if not mistakes:
+        return
+    st.divider()
+    with st.expander(f"❌ Review ({len(mistakes)})"):
+        for i, m in enumerate(mistakes, 1):
+            answer = m["answer"]
+            if len(answer) > 200:
+                answer = answer[:200].rstrip() + "…"
+            st.markdown(f"**{i}. {m['question']}**")
+            st.caption(f"{m['topic']} · {m['score']}")
+            st.markdown(f"Your answer: {answer}")
+            if m["missing"]:
+                st.markdown(f"Missing: {m['missing']}")
+            if i < len(mistakes):
+                st.divider()
+        if st.button("Clear review list", key="clear_mistakes", use_container_width=True):
+            st.session_state.mistakes = []
+            st.rerun()
+
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
     st.title("📚 StudyBuddy")
-    st.caption("AI Learning Partner")
+    st.caption("StudyBuddy — AI Learning Partner")
     st.divider()
 
     uploaded = st.file_uploader(
@@ -135,13 +159,13 @@ with st.sidebar:
                     else:
                         st.rerun()
 
+    _render_mistakes()
+
     st.divider()
     st.caption(f"Model: {os.getenv('MODEL', 'not configured')}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
-
-st.title("StudyBuddy — AI Learning Partner")
 
 state = st.session_state.app_state
 
@@ -170,6 +194,9 @@ elif state in ("questioning", "feedback", "mastered"):
             st.session_state.conversation.append(
                 {"role": "user", "content": answer, "type": "answer"}
             )
+            # evaluate_answer() replaces current_question with the follow-up, so the
+            # question actually answered has to be captured before the call.
+            asked_question = st.session_state.agent.current_question
             with st.spinner("Evaluating your answer…"):
                 try:
                     result = st.session_state.agent.evaluate_answer(answer)
@@ -182,6 +209,17 @@ elif state in ("questioning", "feedback", "mastered"):
             score = result.get("score", "partial")
             feedback = result.get("feedback", "")
             follow_up = result.get("follow_up")
+
+            if score in ("partial", "incorrect"):
+                st.session_state.mistakes.append(
+                    {
+                        "topic": agent.current_topic,
+                        "question": asked_question,
+                        "answer": answer,
+                        "missing": result.get("missing"),
+                        "score": score,
+                    }
+                )
 
             if agent.topic_complete:
                 st.session_state.conversation.append(
